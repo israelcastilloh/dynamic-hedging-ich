@@ -43,7 +43,6 @@ la información del hedge que se tiene que tomar.
 """
 opciones_historicos = pd.read_pickle("./EUR-USD-OPTIONS/options.pkl")
 def query_opciones(escenario_historicos):
-
     opciones = opciones_historicos.drop(columns=['Vol', 'Gamma', 'Vega', 'Theta', 'Call Open Interest',
     'Put Open Interest', 'Call Volume', 'Put volume'])
     coberturas = {}
@@ -77,7 +76,7 @@ def query_opciones(escenario_historicos):
 def SLTP(posiciones, precios_intradia):
     '''
     La funcion recibe dos dataframes, el primero contiene las posiciones que se efectuaran en el sistema,
-    con el cual hizo la prediccion. Este DataFrame tendra que contener columnas con el nombre de Operaciones,
+    con el cual hizo la prediccion. Este DataFrame tendra que contener columnas con el nombre de Predictions,
     close, high, low, open.
     El otro DataFrame tendra que contener los precios del activo seleccionado con las fechas por minuto.
     Este tendra que contener columnas con el nombre de close, open, high, low.
@@ -88,59 +87,65 @@ def SLTP(posiciones, precios_intradia):
     SL = 0.0040 #Este se puede cambiar por el que se desee
     TP = 0.0080 #Este se puede cambiar por el que se desee
 
-    #En este bucle fijaremos los Stop Loss y Take profit de las posiciones conrespondientes que arroja el modelo.
+     #En este bucle fijaremos los Stop Loss y Take profit de las posiciones conrespondientes que arroja el modelo.
     for i in range (len(posiciones)):
-        if posiciones.Operaciones[i-1] == 'sell':
+        if posiciones.Predictions[i-1] == 'sell':
             SLl[i] = round(posiciones.open[i] + SL,4)
             TPl[i] = round(posiciones.open[i] - TP,4)
-        elif posiciones.Operaciones[i-1] == 'buy':
+        elif posiciones.Predictions[i-1] == 'buy':
             SLl[i] = round(posiciones.open[i] - SL,4)
             TPl[i] = round(posiciones.open[i] + TP,4)
     posiciones['SL'] = SLl
     posiciones['TP'] = TPl
+
     precios_intradia['Fecha'] = precios_intradia.index.date
     posiciones['result'] = [0] * len(posiciones)
 
-    #En este par de bucles se encontrara si el precio toco alguno de los limites de precio establecidos anteriormente.
+
+    #En este par de bucles se encontrara si el precio toco alguno de los
+    # limites de precio establecidos anteriormente.
     #El resultado 1 sera para stop loss
     #El resultado 2 sera para el take profit
-    for n in range (len(posiciones)):
-        for i in range (len(precios_intradia)):
-            if precios_intradia.Fecha[i]== posiciones.index[n]:
-                if SLl[n] == precios_intradia.open[i]:
-                    posiciones['result'][n] = 1
-                elif SLl[n] == precios_intradia.close[i]:
-                    posiciones['result'][n] = 1
-                elif SLl[n] == precios_intradia.high[i]:
-                    posiciones['result'][n] = 1
-                elif SLl[n] == precios_intradia.low[i]:
-                    posiciones['result'][n] = 1
-                elif TPl[n] == precios_intradia.open[i]:
-                    posiciones['result'][n] = 2
-                elif TPl[n] == precios_intradia.close[i]:
-                    posiciones['result'][n] = 2
-                elif TPl[n] == precios_intradia.high[i]:
-                    posiciones['result'][n] = 2
-                elif TPl[n] == precios_intradia.low[i]:
-                    posiciones['result'][n] = 2
-
+    posiciones = posiciones.head(10)
+    print(precios_intradia.iloc[1])
+    # for n in range (len(posiciones)):
+    #     for i in range (len(precios_intradia)):
+    #         print(precios_intradia.Fecha[i].strftime('%Y-%m-%d %H:%M:%S'))
+    #         if precios_intradia.Fecha[i] == posiciones.index[n]:
+    #             if SLl[n] == precios_intradia.open[i]:
+    #                 posiciones['result'][n] = 1
+    #             elif SLl[n] == precios_intradia.close[i]:
+    #                 posiciones['result'][n] = 1
+    #             elif SLl[n] == precios_intradia.high[i]:
+    #                 posiciones['result'][n] = 1
+    #             elif SLl[n] == precios_intradia.low[i]:
+    #                 posiciones['result'][n] = 1
+    #             elif TPl[n] == precios_intradia.open[i]:
+    #                 posiciones['result'][n] = 2
+    #             elif TPl[n] == precios_intradia.close[i]:
+    #                 posiciones['result'][n] = 2
+    #             elif TPl[n] == precios_intradia.high[i]:
+    #                 posiciones['result'][n] = 2
+    #             elif TPl[n] == precios_intradia.low[i]:
+    #                 posiciones['result'][n] = 2
+    # print(posiciones)
     #Por ultimo en base a los resultados anteriores se calcula cual es la perdida o ganancia representada en pips.
     #Si una posicion no se cerro durante el dia, se cerrara en el precio de close.
-    R = [0] * len(posiciones)
-    for n in range (len(posiciones)):
-        if posiciones.Operaciones[n] == 'buy':
-            if posiciones['result'][n] == 0:
-                R[n] = posiciones.close[n] - posiciones.open[n]
-            elif posiciones['result'][n] == 1:
-                R[n] = -SL
-            elif posiciones['result'][n] == 2:
-                R[n] = TP
-        elif posiciones.Operaciones[n] == 'sell':
-            if posiciones['result'][n] == 0:
-                R[n] = posiciones.open[n] - posiciones.close[n]
-            elif posiciones['result'][n] == 1:
-                R[n] = -SL
-            elif posiciones['result'][n] == 2:
-                R[n] = TP
-    posiciones['R'] = R
-    return posiciones
+    # R = [0] * len(posiciones)
+    # for n in range (len(posiciones)):
+    #     if posiciones.Predictions[n] == 'buy':
+    #         if posiciones['result'][n] == 0:
+    #             R[n] = posiciones.close[n] - posiciones.open[n]
+    #         elif posiciones['result'][n] == 1:
+    #             R[n] = -SL
+    #         elif posiciones['result'][n] == 2:
+    #             R[n] = TP
+    #     elif posiciones.Predictions[n] == 'sell':
+    #         if posiciones['result'][n] == 0:
+    #             R[n] = posiciones.open[n] - posiciones.close[n]
+    #         elif posiciones['result'][n] == 1:
+    #             R[n] = -SL
+    #         elif posiciones['result'][n] == 2:
+    #             R[n] = TP
+    # posiciones['R'] = R
+    # return posiciones
