@@ -24,7 +24,7 @@ futuros_hist_daily_modelo = pd.read_csv("./escenarios/ResultadosModelo.csv")
 
 
 """
-Vamos a colocar en cada operación de loescenario el precio correspondiente histórico.
+Vamos a colocar en cada operación pronosticada el precio correspondiente histórico.
 """
 def precios_escenarios(futuros_hist_daily_modelo, datos_futuros):
     datos_escenarios = futuros_hist_daily_modelo.set_index('DATE2').drop(columns=["Date","YEAR", "MONTH", "DAY"])
@@ -37,6 +37,9 @@ def precios_escenarios(futuros_hist_daily_modelo, datos_futuros):
 Cargamos los históricos de opciones a memoria con un pkl.
 Vamos a hacer un query para ver cuales son las opciones que más nos convienen
 dependiendo de la fecha de nuestras posiciones y nuestro precio spot.
+
+Esta función arroja un solo DataFrame con la info de la posición, el precio de entrada y además
+la información del hedge que se tiene que tomar.
 """
 opciones_historicos = pd.read_pickle("./EUR-USD-OPTIONS/options.pkl")
 def query_opciones(escenario_historicos):
@@ -67,9 +70,8 @@ def query_opciones(escenario_historicos):
         coberturas_df = coberturas_df.append(coberturas[fecha])
         #print(escenario_historicos.loc[fecha.strftime('%Y-%m-%d')])
 
-    print(coberturas_df)
-    #print(escenario_historicos)
-    return coberturas
+    result = pd.concat([escenario_historicos, coberturas_df], axis=1).dropna()
+    return result
 
 
 def SLTP(posiciones, precios_intradia):
