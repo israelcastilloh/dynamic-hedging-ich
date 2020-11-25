@@ -27,7 +27,7 @@ futuros_hist_daily_modelo = pd.read_csv("./escenarios/ResultadosModelo.csv")
 Vamos a colocar en cada operación de loescenario el precio correspondiente histórico.
 """
 def precios_escenarios(futuros_hist_daily_modelo, datos_futuros):
-    datos_escenarios = futuros_hist_daily_modelo.set_index('DATE2').drop(columns="Date")
+    datos_escenarios = futuros_hist_daily_modelo.set_index('DATE2').drop(columns=["Date","YEAR", "MONTH", "DAY"])
     datos_escenarios.index = pd.to_datetime(datos_escenarios.index)
     datos_futuros.index = pd.to_datetime(datos_futuros.index)
     result = pd.concat([datos_escenarios, datos_futuros], axis=1).dropna()
@@ -40,9 +40,11 @@ dependiendo de la fecha de nuestras posiciones y nuestro precio spot.
 """
 opciones_historicos = pd.read_pickle("./EUR-USD-OPTIONS/options.pkl")
 def query_opciones(escenario_historicos):
+
     opciones = opciones_historicos.drop(columns=['Vol', 'Gamma', 'Vega', 'Theta', 'Call Open Interest',
     'Put Open Interest', 'Call Volume', 'Put volume'])
     coberturas = {}
+    coberturas_df = pd.DataFrame()
     for fecha in escenario_historicos.index:
         precio_cierre = escenario_historicos.loc[fecha.strftime('%Y-%m-%d')]['close']
         precio_upper = precio_cierre + 0.001
@@ -62,13 +64,12 @@ def query_opciones(escenario_historicos):
             filters = filters[filters['Put Delta'] < -0.45]
 
         coberturas[fecha] = filters.head(1).set_index("Date")
-        print(coberturas[fecha])
-        print(escenario_historicos[fecha])
-        escenario_historicos[fecha] = pd.concat([escenario_historicos[fecha], coberturas[fecha]], axis=1)
-    return coberturas
+        coberturas_df = coberturas_df.append(coberturas[fecha])
+        #print(escenario_historicos.loc[fecha.strftime('%Y-%m-%d')])
 
-def coberturas_to_df(dict):
-    return pd.DataFrame.from_dict(dict, orient='index')
+    print(coberturas_df)
+    #print(escenario_historicos)
+    return coberturas
 
 
 def SLTP(posiciones, precios_intradia):
