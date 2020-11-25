@@ -11,7 +11,7 @@
 from data import *
 from datetime import datetime
 import pandas as pd
-
+pd.set_option("display.max_rows", None, "display.max_columns", None)
 
 """
 Cargamos los datos históricos de futuros a memoria con un pkl.
@@ -20,18 +20,14 @@ Así como los datos de los escenarios de operaciones tomadas por el sistema.
 """
 futuros_hist_intraday = pd.read_pickle("./EUR-USD-OPTIONS/future-historical-intraday.pkl")
 futuros_hist_daily = pd.read_pickle("./EUR-USD-OPTIONS/future-historical-daily.pkl")
-futuros_hist_daily_modelo = pd.read_csv("./files/ResultadosModelo.csv")
-escenarios = read_escenarios()['SegundoEscenario']
+futuros_hist_daily_modelo = pd.read_csv("./escenarios/ResultadosModelo.csv")
+
 
 """
 Vamos a colocar en cada operación de loescenario el precio correspondiente histórico.
 """
-def precios_escenarios(datos_escenarios, datos_futuros):
-    datos_escenarios = datos_escenarios.set_index('Fecha')
-    for fecha in datos_escenarios.index:
-        datetimeobject = datetime.strptime(fecha, '%m/%d/%y')
-        newformat = datetimeobject.strftime('%Y-%m-%d')
-        datos_escenarios = datos_escenarios.rename({fecha: newformat}, axis='index')
+def precios_escenarios(futuros_hist_daily_modelo, datos_futuros):
+    datos_escenarios = futuros_hist_daily_modelo.set_index('DATE2').drop(columns="Date")
     datos_escenarios.index = pd.to_datetime(datos_escenarios.index)
     datos_futuros.index = pd.to_datetime(datos_futuros.index)
     result = pd.concat([datos_escenarios, datos_futuros], axis=1).dropna()
@@ -52,11 +48,12 @@ def query_opciones(escenario_historicos):
         precio_upper = precio_cierre + 0.001
         precio_bottom = precio_cierre - 0.001
 
-        filters = opciones[opciones['Date'] == fecha]
-        filters = filters[filters['Price'] < precio_upper]
-        filters = filters[filters['Price'] > precio_bottom]
+        filters = opciones[opciones['Date'] == fecha] #Filtra por Fecha de la Operación
 
-        tipo = escenario_historicos.loc[fecha.strftime('%Y-%m-%d')]['Operaciones']
+        filters = filters[filters['Price'] < precio_upper] #Filtra por Precio de la Operación
+        filters = filters[filters['Price'] > precio_bottom] #Filtra por Precio de la Operación
+
+        tipo = escenario_historicos.loc[fecha.strftime('%Y-%m-%d')]['Predictions']
         if tipo == 'sell':
             filters = filters[filters['Call Delta'] < 0.55]
             filters = filters[filters['Call Delta'] > 0.45]
@@ -64,8 +61,15 @@ def query_opciones(escenario_historicos):
             filters = filters[filters['Put Delta'] > -0.55]
             filters = filters[filters['Put Delta'] < -0.45]
 
-        coberturas[fecha] = filters
+        coberturas[fecha] = filters.head(1).set_index("Date")
+        print(coberturas[fecha])
+        print(escenario_historicos[fecha])
+        escenario_historicos[fecha] = pd.concat([escenario_historicos[fecha], coberturas[fecha]], axis=1)
     return coberturas
+
+def coberturas_to_df(dict):
+    return pd.DataFrame.from_dict(dict, orient='index')
+
 
 def SLTP(posiciones, precios_intradia):
     '''
@@ -80,7 +84,7 @@ def SLTP(posiciones, precios_intradia):
     TPl=[0] * len(posiciones)
     SL = 0.0040 #Este se puede cambiar por el que se desee
     TP = 0.0080 #Este se puede cambiar por el que se desee
-    
+
     #En este bucle fijaremos los Stop Loss y Take profit de las posiciones conrespondientes que arroja el modelo.
     for i in range (len(posiciones)):
         if posiciones.Operaciones[i-1] == 'sell':
@@ -93,7 +97,7 @@ def SLTP(posiciones, precios_intradia):
     posiciones['TP'] = TPl
     precios_intradia['Fecha'] = precios_intradia.index.date
     posiciones['result'] = [0] * len(posiciones)
-    
+
     #En este par de bucles se encontrara si el precio toco alguno de los limites de precio establecidos anteriormente.
     #El resultado 1 sera para stop loss
     #El resultado 2 sera para el take profit
@@ -116,7 +120,7 @@ def SLTP(posiciones, precios_intradia):
                     posiciones['result'][n] = 2
                 elif TPl[n] == precios_intradia.low[i]:
                     posiciones['result'][n] = 2
-    
+
     #Por ultimo en base a los resultados anteriores se calcula cual es la perdida o ganancia representada en pips.
     #Si una posicion no se cerro durante el dia, se cerrara en el precio de close.
     R = [0] * len(posiciones)
