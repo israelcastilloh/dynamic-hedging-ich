@@ -57,15 +57,19 @@ def query_opciones(escenario_historicos):
         filters = filters[filters['Price'] < precio_upper] #Filtra por Precio de la Operación
         filters = filters[filters['Price'] > precio_bottom] #Filtra por Precio de la Operación
 
-        tipo = escenario_historicos.loc[fecha.strftime('%Y-%m-%d')]['Predictions']
-        if tipo == 'sell':
+        tipo_operacion = escenario_historicos.loc[fecha.strftime('%Y-%m-%d')]['Predictions']
+        if tipo_operacion == 'sell':
             filters = filters[filters['Call Delta'] < 0.55]
             filters = filters[filters['Call Delta'] > 0.45]
+            filters['Put Delta'] = 0
         else:
             filters = filters[filters['Put Delta'] > -0.55]
             filters = filters[filters['Put Delta'] < -0.45]
+            filters['Call Delta'] = 0
 
+        coberturas[fecha] = filters.sort_values(by=['Days'])
         coberturas[fecha] = filters.head(1).set_index("Date")
+
         coberturas_df = coberturas_df.append(coberturas[fecha])
         #print(escenario_historicos.loc[fecha.strftime('%Y-%m-%d')])
 
@@ -98,7 +102,7 @@ def SLTP(posiciones, precios_intradia):
     posiciones['SL'] = SLl
     posiciones['TP'] = TPl
 
-    precios_intradia['Fecha'] = precios_intradia.index.date
+    #precios_intradia['Fecha'] = precios_intradia.index.date
     posiciones['result'] = [0] * len(posiciones)
 
 
@@ -106,12 +110,20 @@ def SLTP(posiciones, precios_intradia):
     # limites de precio establecidos anteriormente.
     #El resultado 1 sera para stop loss
     #El resultado 2 sera para el take profit
-    posiciones = posiciones.head(10)
-    print(precios_intradia.iloc[1])
+
+    # Esta linea filtra del histórico de intraday aquellos que son iguales en los históricos de posiciones
+    intrady_indexer_filter = precios_intradia[precios_intradia.index.strftime('%Y-%m-%d') == posiciones.index[-1].strftime('%Y-%m-%d')]
+    posiciones_one_day = posiciones.iloc[-1,:]
+    print()
+    # for minute in intrady_indexer_filter.index:
+    #     #print(intrady_indexer_filter.loc[minute])
+    #     if posiciones
+    #     print('')
+    #print(intrady_indexer_filter)
     # for n in range (len(posiciones)):
     #     for i in range (len(precios_intradia)):
-    #         print(precios_intradia.Fecha[i].strftime('%Y-%m-%d %H:%M:%S'))
-    #         if precios_intradia.Fecha[i] == posiciones.index[n]:
+    #         #print(precios_intradia.index[i].strftime('%Y-%m-%d %H:%M:%S'))
+    #         if precios_intradia.index[i].strftime('%Y-%m-%d') == posiciones.index[n]:
     #             if SLl[n] == precios_intradia.open[i]:
     #                 posiciones['result'][n] = 1
     #             elif SLl[n] == precios_intradia.close[i]:

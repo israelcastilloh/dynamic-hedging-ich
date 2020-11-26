@@ -10,7 +10,7 @@
 """
 import pandas as pd
 
-def load_data_intraday(start: int = 2018, end: int = 2020):
+def load_data_intraday(start: int = 2017, end: int = 2020):
     column_names = ["TimeStamp", "open", "high", "low", "close", "volume"]
     data = pd.DataFrame()
     for year in range(start, end + 1):
@@ -22,10 +22,10 @@ def load_data_intraday(start: int = 2018, end: int = 2020):
                              index_col=["TimeStamp"])
 
 
-    maindf.to_pickle("./EUR-USD-OPTIONS/future-historical-intraday.pkl")
+    #maindf.to_pickle("./EUR-USD-OPTIONS/future-historical-intraday.pkl")
     return maindf
 
-def load_data_daily(start: int = 2018, end: int = 2020, freq: str = 'D'):
+def load_data_daily(start: int = 2017, end: int = 2020, freq: str = 'D'):
     column_names = ["TimeStamp", "open", "high", "low", "close", "volume"]
     data = pd.DataFrame()
     for year in range(start, end + 1):
