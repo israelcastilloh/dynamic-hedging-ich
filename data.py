@@ -20,10 +20,11 @@ def load_data_intraday(start: int = 2017, end: int = 2020):
                              names=column_names,
                              parse_dates=["TimeStamp"],
                              index_col=["TimeStamp"])
+        data = data.append(maindf)
+    data.to_pickle("./EUR-USD-OPTIONS/future-historical-intraday.pkl")
+    return data
 
 
-    #maindf.to_pickle("./EUR-USD-OPTIONS/future-historical-intraday.pkl")
-    return maindf
 
 def load_data_daily(start: int = 2017, end: int = 2020, freq: str = 'D'):
     column_names = ["TimeStamp", "open", "high", "low", "close", "volume"]
@@ -55,18 +56,3 @@ def load_options():
     options = pd.read_excel(file, sheet)
     options.to_pickle("./EUR-USD-OPTIONS/options.pkl")
     return options
-
-def load_escenarios():
-    escenarios = ['PrimerEscenario', 'SegundoEscenario', 'TercerEscenario', 'CuartoEscenario']
-    for escenario in escenarios:
-        file = './escenarios/' + escenario + '.csv'
-        sheet = escenario
-        pd.read_csv(file).to_pickle("./escenarios/"+ escenario + ".pkl")
-    return
-
-def read_escenarios():
-    escenarios = ['PrimerEscenario', 'SegundoEscenario', 'TercerEscenario', 'CuartoEscenario']
-    casos = {}
-    for escenario in escenarios:
-        casos[escenario] = pd.read_pickle("./escenarios/"+ escenario + ".pkl")
-    return casos

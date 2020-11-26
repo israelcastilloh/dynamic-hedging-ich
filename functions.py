@@ -43,10 +43,11 @@ la información del hedge que se tiene que tomar.
 """
 opciones_historicos = pd.read_pickle("./EUR-USD-OPTIONS/options.pkl")
 def query_opciones(escenario_historicos):
-    opciones = opciones_historicos.drop(columns=['Vol', 'Gamma', 'Vega', 'Theta', 'Call Open Interest',
+    opciones = opciones_historicos.drop(columns=['Gamma', 'Vega', 'Theta', 'Call Open Interest',
     'Put Open Interest', 'Call Volume', 'Put volume'])
     coberturas = {}
     coberturas_df = pd.DataFrame()
+
     for fecha in escenario_historicos.index:
         precio_cierre = escenario_historicos.loc[fecha.strftime('%Y-%m-%d')]['close']
         precio_upper = precio_cierre + 0.001
@@ -76,6 +77,8 @@ def query_opciones(escenario_historicos):
     result = pd.concat([escenario_historicos, coberturas_df], axis=1).dropna()
     return result
 
+# futuros_hist_intraday = load_data_intraday(2017, 2020)
+# futuros_hist_daily = load_data_daily(2017, 2020)
 
 def SLTP(posiciones, precios_intradia):
     '''
@@ -88,17 +91,17 @@ def SLTP(posiciones, precios_intradia):
     '''
     SLl=[0] * len(posiciones)
     TPl=[0] * len(posiciones)
-    SL = 0.0040 #Este se puede cambiar por el que se desee
-    TP = 0.0080 #Este se puede cambiar por el que se desee
+    SL = 0.0005 #Este se puede cambiar por el que se desee
+    TP = 0.0010 #Este se puede cambiar por el que se desee
 
      #En este bucle fijaremos los Stop Loss y Take profit de las posiciones conrespondientes que arroja el modelo.
     for i in range (len(posiciones)):
         if posiciones.Predictions[i-1] == 'sell':
-            SLl[i] = round(posiciones.open[i] + SL,4)
-            TPl[i] = round(posiciones.open[i] - TP,4)
+            SLl[i] = round(posiciones.open[i] + SL, 4)
+            TPl[i] = round(posiciones.open[i] - TP, 4)
         elif posiciones.Predictions[i-1] == 'buy':
-            SLl[i] = round(posiciones.open[i] - SL,4)
-            TPl[i] = round(posiciones.open[i] + TP,4)
+            SLl[i] = round(posiciones.open[i] - SL, 4)
+            TPl[i] = round(posiciones.open[i] + TP, 4)
     posiciones['SL'] = SLl
     posiciones['TP'] = TPl
 
@@ -110,16 +113,27 @@ def SLTP(posiciones, precios_intradia):
     # limites de precio establecidos anteriormente.
     #El resultado 1 sera para stop loss
     #El resultado 2 sera para el take profit
-
     # Esta linea filtra del histórico de intraday aquellos que son iguales en los históricos de posiciones
-    intrady_indexer_filter = precios_intradia[precios_intradia.index.strftime('%Y-%m-%d') == posiciones.index[-1].strftime('%Y-%m-%d')]
-    posiciones_one_day = posiciones.iloc[-1,:]
-    print()
-    # for minute in intrady_indexer_filter.index:
-    #     #print(intrady_indexer_filter.loc[minute])
-    #     if posiciones
-    #     print('')
+
+    for d in range(len(posiciones.index)):
+        intrady_indexer_filter = precios_intradia[precios_intradia.index.strftime('%Y-%m-%d') == posiciones.index[d].strftime('%Y-%m-%d')]
+        print(intrady_indexer_filter)
+        posiciones_per_day_price = posiciones.iloc[day,:]
+        for minute in intrady_indexer_filter.index:
+            if (intrady_indexer_filter.loc[minute]['close'] == posiciones_per_day_price['SL'] or
+                intrady_indexer_filter.loc[minute]['high'] == posiciones_per_day_price['SL'] or
+                intrady_indexer_filter.loc[minute]['low'] == posiciones_per_day_price['SL']):
+                posiciones_per_day_price['result'] = 'SL'
+            elif (intrady_indexer_filter.loc[minute]['close'] == posiciones_per_day_price['TP'] or
+                    intrady_indexer_filter.loc[minute]['high'] == posiciones_per_day_price['TP'] or
+                    intrady_indexer_filter.loc[minute]['low'] == posiciones_per_day_price['TP']):
+                posiciones_per_day_price['result'] = 'TP'
+            else:
+                posiciones_per_day_price['result'] = 'FLOAT'
+        print(posiciones_per_day_price)
+
     #print(intrady_indexer_filter)
+
     # for n in range (len(posiciones)):
     #     for i in range (len(precios_intradia)):
     #         #print(precios_intradia.index[i].strftime('%Y-%m-%d %H:%M:%S'))
@@ -141,8 +155,11 @@ def SLTP(posiciones, precios_intradia):
     #             elif TPl[n] == precios_intradia.low[i]:
     #                 posiciones['result'][n] = 2
     # print(posiciones)
+
     #Por ultimo en base a los resultados anteriores se calcula cual es la perdida o ganancia representada en pips.
     #Si una posicion no se cerro durante el dia, se cerrara en el precio de close.
+
+
     # R = [0] * len(posiciones)
     # for n in range (len(posiciones)):
     #     if posiciones.Predictions[n] == 'buy':
