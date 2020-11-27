@@ -9,7 +9,8 @@
 """
 
 from data import *
-from datetime import datetime
+import time
+from datetime import datetime, date, time, timedelta
 import pandas as pd
 pd.set_option("display.max_rows", None, "display.max_columns", None)
 
@@ -49,31 +50,59 @@ def query_opciones(escenario_historicos):
     coberturas_df = pd.DataFrame()
 
     for fecha in escenario_historicos.index:
-        precio_cierre = escenario_historicos.loc[fecha.strftime('%Y-%m-%d')]['close']
-        precio_upper = precio_cierre + 0.001
-        precio_bottom = precio_cierre - 0.001
+        fecha_fix = datetime.strptime(fecha.strftime('%Y-%m-%d'), '%Y-%m-%d')
+        fecha_fix_up = fecha_fix + timedelta(days=5)
+        fecha_fix_down = fecha_fix - timedelta(days=5)
 
-        filters = opciones[opciones['Date'] == fecha] #Filtra por Fecha de la Operación
+        precio_cierre = escenario_historicos.loc[fecha.strftime('%Y-%m-%d')]['open']
+
+        precio_upper = precio_cierre + 0.1
+        precio_bottom = precio_cierre - 0.1
+
+        filters = opciones[opciones['Date'] < fecha_fix_up] #Filtra por Precio de la Operación
+        filters = filters[filters['Date'] > fecha_fix_down] #Filtra por Precio de la Operación
+        #filters = filters[filters['Date'] == fecha]
+
+        #filters = opciones[opciones['Date'] == fecha]
+        #filters = opciones[opciones['Date'] == fecha] #Filtra por Fecha de la Operación
+
+        filters = filters[filters['Days'] > 1] #Filtra por Precio de la Operación
+        filters = filters[filters['Days'] < 5] #Filtra por Precio de la Operación
+
 
         filters = filters[filters['Price'] < precio_upper] #Filtra por Precio de la Operación
         filters = filters[filters['Price'] > precio_bottom] #Filtra por Precio de la Operación
 
         tipo_operacion = escenario_historicos.loc[fecha.strftime('%Y-%m-%d')]['Predictions']
+
         if tipo_operacion == 'sell':
             filters = filters[filters['Call Delta'] < 0.55]
             filters = filters[filters['Call Delta'] > 0.45]
+            #coberturas[fecha] = filters.sort_values(by=['Put'])
             filters['Put Delta'] = 0
         else:
             filters = filters[filters['Put Delta'] > -0.55]
             filters = filters[filters['Put Delta'] < -0.45]
+            #coberturas[fecha] = filters.sort_values(by=['Call'])
             filters['Call Delta'] = 0
 
-        coberturas[fecha] = filters.sort_values(by=['Days'])
-        coberturas[fecha] = filters.head(1).set_index("Date")
+        filters = filters.sort_values(by=['Date'], ascending=False)
+        #filters = filters.sort_values(by=['Days'], ascending=True)
 
-        coberturas_df = coberturas_df.append(coberturas[fecha])
+        #filters['Fecha Posicion'] = fecha
+        #filters['Prediction'] = tipo_operacion
+        #filters['Open'] = precio_cierre
+
+        coberturas[fecha] = filters.head(1)
+
+        # print(fecha , '--------------at price', precio_cierre,'------------------------------')
+        # print(coberturas[fecha])
+
+        coberturas_df = coberturas_df.append(coberturas[fecha]).set_index("Date")
         #print(escenario_historicos.loc[fecha.strftime('%Y-%m-%d')])
-
+    print(coberturas_df)
+    print(escenario_historicos)
+    #coberturas_df.to_csv('recomendacion_opcioens.csv')
     result = pd.concat([escenario_historicos, coberturas_df], axis=1).dropna()
     return result
 
@@ -117,20 +146,18 @@ def SLTP(posiciones, precios_intradia):
 
     for d in range(len(posiciones.index)):
         intrady_indexer_filter = precios_intradia[precios_intradia.index.strftime('%Y-%m-%d') == posiciones.index[d].strftime('%Y-%m-%d')]
-        print(intrady_indexer_filter)
-        posiciones_per_day_price = posiciones.iloc[day,:]
         for minute in intrady_indexer_filter.index:
-            if (intrady_indexer_filter.loc[minute]['close'] == posiciones_per_day_price['SL'] or
-                intrady_indexer_filter.loc[minute]['high'] == posiciones_per_day_price['SL'] or
-                intrady_indexer_filter.loc[minute]['low'] == posiciones_per_day_price['SL']):
-                posiciones_per_day_price['result'] = 'SL'
-            elif (intrady_indexer_filter.loc[minute]['close'] == posiciones_per_day_price['TP'] or
-                    intrady_indexer_filter.loc[minute]['high'] == posiciones_per_day_price['TP'] or
-                    intrady_indexer_filter.loc[minute]['low'] == posiciones_per_day_price['TP']):
-                posiciones_per_day_price['result'] = 'TP'
+            if (intrady_indexer_filter.loc[minute]['close'] == posiciones.loc[d]['SL'] or
+                intrady_indexer_filter.loc[minute]['high'] == posiciones.loc[d]['SL'] or
+                intrady_indexer_filter.loc[minute]['low'] == posiciones.loc[d]['SL']):
+                posiciones.loc[d]['result'] = 'SL'
+            elif (intrady_indexer_filter.loc[minute]['close'] == posiciones.loc[d]['SL'] or
+                    intrady_indexer_filter.loc[minute]['high'] == posiciones.loc[d]['SL'] or
+                    intrady_indexer_filter.loc[minute]['low'] == posiciones.loc[d]['SL']):
+                posiciones.loc[d]['result'] = 'TP'
             else:
-                posiciones_per_day_price['result'] = 'FLOAT'
-        print(posiciones_per_day_price)
+                posiciones.loc[d]['result'] = 'FLOAT'
+    print(posiciones)
 
     #print(intrady_indexer_filter)
 

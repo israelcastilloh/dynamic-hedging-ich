@@ -22,5 +22,5 @@ futuros_hist_daily_modelo = pd.read_csv("./escenarios/ResultadosModelo.csv")
 escenario_historicos = precios_escenarios(futuros_hist_daily_modelo, futuros_hist_daily)
 
 coberturas_historicas = query_opciones(escenario_historicos)
-
-SLTP = SLTP(coberturas_historicas, futuros_hist_intraday)
+print(coberturas_historicas)
+#SLTP = SLTP(coberturas_historicas, futuros_hist_intraday)
