@@ -13,6 +13,7 @@ import time
 from datetime import datetime, date, time, timedelta
 import pandas as pd
 pd.set_option("display.max_rows", None, "display.max_columns", None)
+pd.options.display.width=None
 
 """
 Cargamos los datos históricos de futuros a memoria con un pkl.
@@ -61,14 +62,10 @@ def query_opciones(escenario_historicos):
 
         filters = opciones[opciones['Date'] < fecha_fix_up] #Filtra por Precio de la Operación
         filters = filters[filters['Date'] > fecha_fix_down] #Filtra por Precio de la Operación
-        #filters = filters[filters['Date'] == fecha]
-
-        #filters = opciones[opciones['Date'] == fecha]
-        #filters = opciones[opciones['Date'] == fecha] #Filtra por Fecha de la Operación
+        filters = filters[filters['Date'] == fecha]
 
         filters = filters[filters['Days'] > 1] #Filtra por Precio de la Operación
         filters = filters[filters['Days'] < 5] #Filtra por Precio de la Operación
-
 
         filters = filters[filters['Price'] < precio_upper] #Filtra por Precio de la Operación
         filters = filters[filters['Price'] > precio_bottom] #Filtra por Precio de la Operación
@@ -78,34 +75,22 @@ def query_opciones(escenario_historicos):
         if tipo_operacion == 'sell':
             filters = filters[filters['Call Delta'] < 0.55]
             filters = filters[filters['Call Delta'] > 0.45]
-            #coberturas[fecha] = filters.sort_values(by=['Put'])
             filters['Put Delta'] = 0
         else:
             filters = filters[filters['Put Delta'] > -0.55]
             filters = filters[filters['Put Delta'] < -0.45]
-            #coberturas[fecha] = filters.sort_values(by=['Call'])
             filters['Call Delta'] = 0
 
         filters = filters.sort_values(by=['Date'], ascending=False)
-        #filters = filters.sort_values(by=['Days'], ascending=True)
-
-        #filters['Fecha Posicion'] = fecha
-        #filters['Prediction'] = tipo_operacion
-        #filters['Open'] = precio_cierre
-
+        filters['Prediciton Date'] = fecha
         coberturas[fecha] = filters.head(1)
-
-        # print(fecha , '--------------at price', precio_cierre,'------------------------------')
-        # print(coberturas[fecha])
-
-        coberturas_df = coberturas_df.append(coberturas[fecha]).set_index("Date")
-        #print(escenario_historicos.loc[fecha.strftime('%Y-%m-%d')])
-    print(coberturas_df)
-    print(escenario_historicos)
-    #coberturas_df.to_csv('recomendacion_opcioens.csv')
+        coberturas_df = coberturas_df.append(coberturas[fecha])
+    coberturas_df = coberturas_df.set_index('Date')
     result = pd.concat([escenario_historicos, coberturas_df], axis=1).dropna()
+    result.to_csv('./EUR-USD-OPTIONS/QUERIED OPTIONS.csv')
     return result
 
+#coberturas_df.to_csv('recomendacion_opcioens.csv')
 # futuros_hist_intraday = load_data_intraday(2017, 2020)
 # futuros_hist_daily = load_data_daily(2017, 2020)
 
@@ -134,7 +119,6 @@ def SLTP(posiciones, precios_intradia):
     posiciones['SL'] = SLl
     posiciones['TP'] = TPl
 
-    #precios_intradia['Fecha'] = precios_intradia.index.date
     posiciones['result'] = [0] * len(posiciones)
 
 
@@ -145,19 +129,26 @@ def SLTP(posiciones, precios_intradia):
     # Esta linea filtra del histórico de intraday aquellos que son iguales en los históricos de posiciones
 
     for d in range(len(posiciones.index)):
-        intrady_indexer_filter = precios_intradia[precios_intradia.index.strftime('%Y-%m-%d') == posiciones.index[d].strftime('%Y-%m-%d')]
-        for minute in intrady_indexer_filter.index:
-            if (intrady_indexer_filter.loc[minute]['close'] == posiciones.loc[d]['SL'] or
-                intrady_indexer_filter.loc[minute]['high'] == posiciones.loc[d]['SL'] or
-                intrady_indexer_filter.loc[minute]['low'] == posiciones.loc[d]['SL']):
-                posiciones.loc[d]['result'] = 'SL'
-            elif (intrady_indexer_filter.loc[minute]['close'] == posiciones.loc[d]['SL'] or
-                    intrady_indexer_filter.loc[minute]['high'] == posiciones.loc[d]['SL'] or
-                    intrady_indexer_filter.loc[minute]['low'] == posiciones.loc[d]['SL']):
-                posiciones.loc[d]['result'] = 'TP'
-            else:
-                posiciones.loc[d]['result'] = 'FLOAT'
-    print(posiciones)
+
+        position_day = posiciones.index[d].strftime('%Y-%m-%d')
+        price_intraday = precios_intradia.index.strftime('%Y-%m-%d')
+
+        intrady_indexer_filter = precios_intradia[price_intraday == position_day]
+
+        print(position_day, '---------------------------------------------------------')
+        print(intrady_indexer_filter.head(5))
+        # for minute in intrady_indexer_filter.index:
+        #     if (intrady_indexer_filter.loc[minute]['close'] == posiciones.loc[d]['SL'] or
+        #         intrady_indexer_filter.loc[minute]['high'] == posiciones.loc[d]['SL'] or
+        #         intrady_indexer_filter.loc[minute]['low'] == posiciones.loc[d]['SL']):
+        #         posiciones.loc[d]['result'] = 'SL'
+        #     elif (intrady_indexer_filter.loc[minute]['close'] == posiciones.loc[d]['SL'] or
+        #             intrady_indexer_filter.loc[minute]['high'] == posiciones.loc[d]['SL'] or
+        #             intrady_indexer_filter.loc[minute]['low'] == posiciones.loc[d]['SL']):
+        #         posiciones.loc[d]['result'] = 'TP'
+        #     else:
+        #         posiciones.loc[d]['result'] = 'FLOAT'
+    #print(posiciones.head(5))
 
     #print(intrady_indexer_filter)
 
