@@ -87,7 +87,7 @@ def query_opciones(escenario_historicos):
         coberturas_df = coberturas_df.append(coberturas[fecha])
     coberturas_df = coberturas_df.set_index('Date')
     result = pd.concat([escenario_historicos, coberturas_df], axis=1).dropna()
-    result.to_csv('./EUR-USD-OPTIONS/QUERIED OPTIONS.csv')
+    #result.to_csv('./EUR-USD-OPTIONS/QUERIED OPTIONS.csv')
     return result
 
 #coberturas_df.to_csv('recomendacion_opcioens.csv')
@@ -101,11 +101,12 @@ def SLTP(posiciones, precios_intradia):
     close, high, low, open.
     El otro DataFrame tendra que contener los precios del activo seleccionado con las fechas por minuto.
     Este tendra que contener columnas con el nombre de close, open, high, low.
-    Dentro de esta funcion, el Stop Loss esta fijado en 40 pips y el Take Profit fijado en 80 pips.
+    Dentro de esta funcion, el Stop Loss esta fijado en 5 pips y el Take Profit fijado en 10 pips.
     '''
     SLl=[0] * len(posiciones)
     TPl=[0] * len(posiciones)
-    SL = 0.0005 #Este se puede cambiar por el que se desee
+
+    SL = 0.0010 #Este se puede cambiar por el que se desee
     TP = 0.0010 #Este se puede cambiar por el que se desee
 
      #En este bucle fijaremos los Stop Loss y Take profit de las posiciones conrespondientes que arroja el modelo.
@@ -121,58 +122,66 @@ def SLTP(posiciones, precios_intradia):
 
     posiciones['result'] = [0] * len(posiciones)
 
+    #posiciones = posiciones.head(20) ### eliminar
 
-    #En este par de bucles se encontrara si el precio toco alguno de los
-    # limites de precio establecidos anteriormente.
-    #El resultado 1 sera para stop loss
-    #El resultado 2 sera para el take profit
-    # Esta linea filtra del histórico de intraday aquellos que son iguales en los históricos de posiciones
-
+    daily_df = pd.DataFrame()
     for d in range(len(posiciones.index)):
 
         position_day = posiciones.index[d].strftime('%Y-%m-%d')
-        price_intraday = precios_intradia.index.strftime('%Y-%m-%d')
+        intraday_date = precios_intradia.index.strftime('%Y-%m-%d')
+        intrady_indexer_filter = precios_intradia[intraday_date == position_day]
+        minute_df = pd.DataFrame()
 
-        intrady_indexer_filter = precios_intradia[price_intraday == position_day]
+        for minute in intrady_indexer_filter.index:
 
-        print(position_day, '---------------------------------------------------------')
-        print(intrady_indexer_filter.head(5))
-        # for minute in intrady_indexer_filter.index:
-        #     if (intrady_indexer_filter.loc[minute]['close'] == posiciones.loc[d]['SL'] or
-        #         intrady_indexer_filter.loc[minute]['high'] == posiciones.loc[d]['SL'] or
-        #         intrady_indexer_filter.loc[minute]['low'] == posiciones.loc[d]['SL']):
-        #         posiciones.loc[d]['result'] = 'SL'
-        #     elif (intrady_indexer_filter.loc[minute]['close'] == posiciones.loc[d]['SL'] or
-        #             intrady_indexer_filter.loc[minute]['high'] == posiciones.loc[d]['SL'] or
-        #             intrady_indexer_filter.loc[minute]['low'] == posiciones.loc[d]['SL']):
-        #         posiciones.loc[d]['result'] = 'TP'
-        #     else:
-        #         posiciones.loc[d]['result'] = 'FLOAT'
-    #print(posiciones.head(5))
+            high = intrady_indexer_filter.loc[minute]['high']
+            open = intrady_indexer_filter.loc[minute]['open']
+            close = intrady_indexer_filter.loc[minute]['close']
+            low = intrady_indexer_filter.loc[minute]['low']
 
-    #print(intrady_indexer_filter)
+            stop_loss =  posiciones.loc[position_day]['SL']
+            take_profit = posiciones.loc[position_day]['TP']
 
-    # for n in range (len(posiciones)):
-    #     for i in range (len(precios_intradia)):
-    #         #print(precios_intradia.index[i].strftime('%Y-%m-%d %H:%M:%S'))
-    #         if precios_intradia.index[i].strftime('%Y-%m-%d') == posiciones.index[n]:
-    #             if SLl[n] == precios_intradia.open[i]:
-    #                 posiciones['result'][n] = 1
-    #             elif SLl[n] == precios_intradia.close[i]:
-    #                 posiciones['result'][n] = 1
-    #             elif SLl[n] == precios_intradia.high[i]:
-    #                 posiciones['result'][n] = 1
-    #             elif SLl[n] == precios_intradia.low[i]:
-    #                 posiciones['result'][n] = 1
-    #             elif TPl[n] == precios_intradia.open[i]:
-    #                 posiciones['result'][n] = 2
-    #             elif TPl[n] == precios_intradia.close[i]:
-    #                 posiciones['result'][n] = 2
-    #             elif TPl[n] == precios_intradia.high[i]:
-    #                 posiciones['result'][n] = 2
-    #             elif TPl[n] == precios_intradia.low[i]:
-    #                 posiciones['result'][n] = 2
-    # print(posiciones)
+            condition_sell_sl = (high >= stop_loss or low >= stop_loss or open >= stop_loss or close >= stop_loss)
+            condition_sell_tp = (high <= take_profit or low <=  take_profit or open <= take_profit or close <= take_profit)
+
+            condition_buy_sl = (high <= stop_loss or low <= stop_loss or open <= stop_loss or close <= stop_loss)
+            condition_buy_tp = (high >= take_profit or low >=  take_profit or open >= take_profit or close >= take_profit)
+
+            '''
+            SELL SIDE
+            '''
+            if posiciones.Predictions[d] == 'sell':
+                if condition_sell_tp == True:
+                    posiciones.iloc[d, -1] = 'TP'
+                    minute_df = minute_df.append(posiciones.loc[position_day])
+                    break
+                elif condition_sell_sl == True:
+                    posiciones.iloc[d, -1] = 'SL'
+                    minute_df = minute_df.append(posiciones.loc[position_day])
+                    break
+                else:
+                    posiciones.iloc[d, -1] = 'FLOAT'
+                    minute_df = minute_df.append(posiciones.loc[position_day])
+
+            '''
+            BUY SIDE
+            '''
+            if posiciones.Predictions[d] == 'buy':
+                if condition_buy_tp == True:
+                    posiciones.iloc[d, -1] = 'TP'
+                    minute_df = minute_df.append(posiciones.loc[position_day])
+                    break
+                elif condition_buy_sl == True:
+                    posiciones.iloc[d, -1] = 'SL'
+                    minute_df = minute_df.append(posiciones.loc[position_day])
+                    break
+                else:
+                    posiciones.iloc[d, -1] = 'FLOAT'
+                    minute_df = minute_df.append(posiciones.loc[position_day])
+        #print(minute_df)
+        daily_df = daily_df.append(minute_df.tail(1))
+    print(daily_df)
 
     #Por ultimo en base a los resultados anteriores se calcula cual es la perdida o ganancia representada en pips.
     #Si una posicion no se cerro durante el dia, se cerrara en el precio de close.
