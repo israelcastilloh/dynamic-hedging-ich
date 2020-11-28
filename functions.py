@@ -20,10 +20,9 @@ Cargamos los datos históricos de futuros a memoria con un pkl.
 Tanto daily como intraday.
 Así como los datos de los escenarios de operaciones tomadas por el sistema.
 """
-futuros_hist_intraday = pd.read_pickle("./EUR-USD-OPTIONS/future-historical-intraday.pkl")
-futuros_hist_daily = pd.read_pickle("./EUR-USD-OPTIONS/future-historical-daily.pkl")
+futuros_hist_intraday = pd.read_pickle("./backtest/future-historical-intraday.pkl")
+futuros_hist_daily = pd.read_pickle("./backtest/future-historical-daily.pkl")
 futuros_hist_daily_modelo = pd.read_csv("./escenarios/ResultadosModelo.csv")
-
 
 """
 Vamos a colocar en cada operación pronosticada el precio correspondiente histórico.
@@ -33,7 +32,9 @@ def precios_escenarios(futuros_hist_daily_modelo, datos_futuros):
     datos_escenarios.index = pd.to_datetime(datos_escenarios.index)
     datos_futuros.index = pd.to_datetime(datos_futuros.index)
     result = pd.concat([datos_escenarios, datos_futuros], axis=1).dropna()
+    result['p_ap_op'] = result.open
     return result
+
 
 """
 Cargamos los históricos de opciones a memoria con un pkl.
@@ -43,7 +44,8 @@ dependiendo de la fecha de nuestras posiciones y nuestro precio spot.
 Esta función arroja un solo DataFrame con la info de la posición, el precio de entrada y además
 la información del hedge que se tiene que tomar.
 """
-opciones_historicos = pd.read_pickle("./EUR-USD-OPTIONS/options.pkl")
+
+opciones_historicos = pd.read_pickle("./backtest/options.pkl")
 def query_opciones(escenario_historicos):
     opciones = opciones_historicos.drop(columns=['Gamma', 'Vega', 'Theta', 'Call Open Interest',
     'Put Open Interest', 'Call Volume', 'Put volume'])
@@ -87,7 +89,11 @@ def query_opciones(escenario_historicos):
         coberturas_df = coberturas_df.append(coberturas[fecha])
     coberturas_df = coberturas_df.set_index('Date')
     result = pd.concat([escenario_historicos, coberturas_df], axis=1).dropna()
-    #result.to_csv('./EUR-USD-OPTIONS/QUERIED OPTIONS.csv')
+
+    '''SAVING TO CSV AND PICKLE '''
+
+    result.to_csv('./backtest/queried_options.csv')
+    result.to_pickle('./backtest/queried_options.pkl')
     return result
 
 #coberturas_df.to_csv('recomendacion_opcioens.csv')
@@ -120,9 +126,10 @@ def SLTP(posiciones, precios_intradia):
     posiciones['SL'] = SLl
     posiciones['TP'] = TPl
 
-    posiciones['result'] = [0] * len(posiciones)
-
-    #posiciones = posiciones.head(20) ### eliminar
+    posiciones['result'] = ''
+    posiciones['p_c_op'] = 0.0
+    posiciones['pips'] = float(0.00000)
+    #posiciones = posiciones.head(5) ### eliminar
 
     daily_df = pd.DataFrame()
     for d in range(len(posiciones.index)):
@@ -153,15 +160,20 @@ def SLTP(posiciones, precios_intradia):
             '''
             if posiciones.Predictions[d] == 'sell':
                 if condition_sell_tp == True:
-                    posiciones.iloc[d, -1] = 'TP'
+                    posiciones.result[d] = 'TP'
+                    posiciones.p_c_op[d] = posiciones.close[d]
+                    posiciones.pips[d] = posiciones.p_ap_op[d]-posiciones.TP[d]
                     minute_df = minute_df.append(posiciones.loc[position_day])
                     break
                 elif condition_sell_sl == True:
-                    posiciones.iloc[d, -1] = 'SL'
+                    posiciones.result[d] = 'SL'
+                    posiciones.pips[d] = posiciones.p_ap_op[d]-posiciones.SL[d]
                     minute_df = minute_df.append(posiciones.loc[position_day])
                     break
                 else:
-                    posiciones.iloc[d, -1] = 'FLOAT'
+                    posiciones.result[d] = 'FLOAT'
+                    posiciones.p_c_op[d] =posiciones.close[d]
+                    posiciones.pips[d] = posiciones.TP[d]-posiciones.close[d]
                     minute_df = minute_df.append(posiciones.loc[position_day])
 
             '''
@@ -169,39 +181,26 @@ def SLTP(posiciones, precios_intradia):
             '''
             if posiciones.Predictions[d] == 'buy':
                 if condition_buy_tp == True:
-                    posiciones.iloc[d, -1] = 'TP'
+                    posiciones.result[d] = 'TP'
+                    posiciones.p_c_op[d] = posiciones.close[d]
+                    posiciones.pips[d] = posiciones.TP[d]- posiciones.p_ap_op[d]
                     minute_df = minute_df.append(posiciones.loc[position_day])
                     break
                 elif condition_buy_sl == True:
-                    posiciones.iloc[d, -1] = 'SL'
+                    posiciones.result[d] = 'SL'
+                    posiciones.pips[d] = posiciones.SL[d]-posiciones.p_ap_op[d]
                     minute_df = minute_df.append(posiciones.loc[position_day])
                     break
                 else:
-                    posiciones.iloc[d, -1] = 'FLOAT'
+                    posiciones.result[d] = 'FLOAT'
+                    posiciones.p_c_op[d] =posiciones.close[d]
+                    posiciones.pips[d] = posiciones.close[d]-posiciones.p_ap_op[d]
                     minute_df = minute_df.append(posiciones.loc[position_day])
-        #print(minute_df)
+            posiciones.pips = posiciones.pips * 10_000
         daily_df = daily_df.append(minute_df.tail(1))
-    print(daily_df)
 
-    #Por ultimo en base a los resultados anteriores se calcula cual es la perdida o ganancia representada en pips.
-    #Si una posicion no se cerro durante el dia, se cerrara en el precio de close.
+        ''' SAVING THE DATA TO CSV AND PICKLE '''
 
-
-    # R = [0] * len(posiciones)
-    # for n in range (len(posiciones)):
-    #     if posiciones.Predictions[n] == 'buy':
-    #         if posiciones['result'][n] == 0:
-    #             R[n] = posiciones.close[n] - posiciones.open[n]
-    #         elif posiciones['result'][n] == 1:
-    #             R[n] = -SL
-    #         elif posiciones['result'][n] == 2:
-    #             R[n] = TP
-    #     elif posiciones.Predictions[n] == 'sell':
-    #         if posiciones['result'][n] == 0:
-    #             R[n] = posiciones.open[n] - posiciones.close[n]
-    #         elif posiciones['result'][n] == 1:
-    #             R[n] = -SL
-    #         elif posiciones['result'][n] == 2:
-    #             R[n] = TP
-    # posiciones['R'] = R
-    # return posiciones
+        daily_df.to_csv('./backtest/sltp_backtest.csv')
+        daily_df.to_pickle('./backtest/sltp_backtest.pkl')
+    return daily_df
