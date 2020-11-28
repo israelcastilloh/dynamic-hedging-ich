@@ -196,11 +196,11 @@ def SLTP(posiciones, precios_intradia):
                     posiciones.p_c_op[d] =posiciones.close[d]
                     posiciones.pips[d] = posiciones.close[d]-posiciones.p_ap_op[d]
                     minute_df = minute_df.append(posiciones.loc[position_day])
-            posiciones.pips = posiciones.pips * 10_000
+
         daily_df = daily_df.append(minute_df.tail(1))
+    daily_df.pips = daily_df.pips * 10000
 
-        ''' SAVING THE DATA TO CSV AND PICKLE '''
-
-        daily_df.to_csv('./backtest/sltp_backtest.csv')
-        daily_df.to_pickle('./backtest/sltp_backtest.pkl')
+    ''' SAVING THE DATA TO CSV AND PICKLE '''
+    daily_df.to_csv('./backtest/sltp_backtest.csv')
+    daily_df.to_pickle('./backtest/sltp_backtest.pkl')
     return daily_df
