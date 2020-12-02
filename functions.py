@@ -12,6 +12,7 @@ from data import *
 import time
 from datetime import datetime, date, time, timedelta
 import pandas as pd
+import numpy as np
 pd.set_option("display.max_rows", None, "display.max_columns", None)
 pd.options.display.width=None
 
@@ -113,7 +114,7 @@ def SLTP(posiciones, precios_intradia):
     TPl=[0] * len(posiciones)
 
     SL = 0.0010 #Este se puede cambiar por el que se desee
-    TP = 0.0010 #Este se puede cambiar por el que se desee
+    TP = 0.0020 #Este se puede cambiar por el que se desee
 
      #En este bucle fijaremos los Stop Loss y Take profit de las posiciones conrespondientes que arroja el modelo.
     for i in range (len(posiciones)):
@@ -204,3 +205,11 @@ def SLTP(posiciones, precios_intradia):
     daily_df.to_csv('./backtest/sltp_backtest.csv')
     daily_df.to_pickle('./backtest/sltp_backtest.pkl')
     return daily_df
+pd.set_option('display.float_format', lambda x: '%.5f' % x)
+def profit_drawdown():
+    backtest = pd.read_pickle("./backtest/sltp_backtest.pkl")
+
+    profit_drawdown = backtest.pips
+    profit_drawdown = pd.concat([profit_drawdown, np.cumsum(backtest.pips)], axis=1)
+    print(profit_drawdown)
+    return
